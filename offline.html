@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hors ligne - CS La Colombe</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .offline-container {
+      max-width: 500px;
+      padding: 2rem;
+    }
+    h1 { font-size: 3rem; margin-bottom: 0; }
+    p { font-size: 1.2rem; opacity: 0.9; }
+    .retry-btn {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 50px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-top: 2rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .retry-btn:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <h1>📴</h1>
+    <h2>Vous êtes hors ligne</h2>
+    <p>L'application continuera de fonctionner et se synchronisera automatiquement dès que votre connexion sera rétablie.</p>
+    <button class="retry-btn" onclick="window.location.reload()">
+      Réessayer
+    </button>
+  </div>
+</body>
+</html>
