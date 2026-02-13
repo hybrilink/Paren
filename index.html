@@ -2142,7 +2142,7 @@ async function initializeFirebaseMessaging() {
     // Obtenir le token FCM avec VAPID Key
     const token = await messaging.getToken({
       vapidKey: vapidKey,
-      serviceWorkerRegistration: await navigator.serviceWorker.register('firebase-messaging-sw.js')
+      serviceWorkerRegistration: await navigator.serviceWorker.register('/firebase-messaging-sw.js')
     });
     
     console.log('✅ Token FCM obtenu:', token);
