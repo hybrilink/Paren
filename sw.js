@@ -1,4 +1,3 @@
-
 // sw.js - Service Worker Robuste et Stable pour CS La Colombe
 const CACHE_NAME = 'cs-lacolombe-static-v2';
 const APP_VERSION = '2.1.2';
@@ -6,17 +5,17 @@ const APP_VERSION = '2.1.2';
 // Cache UNIQUEMENT les ressources statiques, PAS les API
 const STATIC_ASSETS = [
   './',
-  './index.html',
-  './offline.html',
-  './manifest.json',
-  './icons/icon-72x72.png',
-  './icons/icon-96x96.png',
-  './icons/icon-128x128.png',
-  './icons/icon-144x144.png',
-  './icons/icon-152x152.png',
-  './icons/icon-192x192.png',
-  './icons/icon-384x384.png',
-  './icons/icon-512x512.png'
+  'index.html',
+  'offline.html',
+  'manifest.json',
+  'icons/icon-72x72.png',
+  'icons/icon-96x96.png',
+  'icons/icon-128x128.png',
+  'icons/icon-144x144.png',
+  'icons/icon-152x152.png',
+  'icons/icon-192x192.png',
+  'icons/icon-384x384.png',
+  'icons/icon-512x512.png'
 ];
 
 // Configuration Firebase - UNIQUEMENT pour le SW
@@ -117,8 +116,8 @@ function displayNotification(payload) {
   
   const options = {
     body: notificationBody,
-    icon: './icons/icon-192x192.png',
-    badge: './icons/icon-72x72.png',
+    icon: '.icon-192x192.png',
+    badge: '.icon-72x72.png',
     vibrate: [200, 100, 200],
     data: notificationData,
     tag: notificationData.type || 'notification',
@@ -176,7 +175,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Fallback vers la page offline
-          return caches.match('./offline.html');
+          return caches.match('offline.html');
         })
     );
     return;
@@ -226,7 +225,7 @@ self.addEventListener('notificationclick', (event) => {
       
       // Trouver un client existant
       for (const client of allClients) {
-        if (client.url.includes('/index.html') && 'focus' in client) {
+        if (client.url.includes('index.html') && 'focus' in client) {
           await client.focus();
           // Envoyer les données de navigation
           client.postMessage({
@@ -238,7 +237,7 @@ self.addEventListener('notificationclick', (event) => {
       }
       
       // Ouvrir une nouvelle fenêtre
-      await clients.openWindow('./index.html');
+      await clients.openWindow('index.html');
     })()
   );
 });
