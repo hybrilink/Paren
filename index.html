@@ -40,7 +40,284 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <!-- Scripts de mise à jour -->
 <script src="update-system.js"></script>
+<!-- ============================================ -->
+<!-- INITIALISATION FIREBASE ET NOTIFICATIONS     -->
+<!-- ============================================ -->
+<script type="module">
+// Imports Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging.js";
+import { getFirestore, collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
+// Configuration Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyBn7VIddclO7KtrXb5sibCr9SjVLjOy-qI",
+  authDomain: "theo1d.firebaseapp.com",
+  projectId: "theo1d",
+  storageBucket: "theo1d.firebasestorage.app",
+  messagingSenderId: "269629842962",
+  appId: "1:269629842962:web:a80a12b04448fe1e595acb"
+};
+
+// Clé VAPID publique
+const VAPID_KEY = "BM8H6cADaP6tiA4t9Oc9D36jk1UmYoUBV3cATlJ5mvZ_-eQ5xd6HgX5twxWvZ2U2Y98HBkJ8bTph7epPJJYqBpc";
+
+// Clé serveur FCM (À garder SECRÈTE - Utilisée uniquement dans discipline.html)
+window.FCM_SERVER_KEY = "AAAAhxJinHY:APA91bEoQVcZAh8gsMzyB4d1pa4NKP_HcADkA-4OoU9A8ZAd4UzABX0Y6gJd9M6n8pL7kQw3RvXy2Zt1cWf3VbI4Sd5Gj7Hk9Lq0Mn1OjR8SfT2UvWxY3Z4A5B6C7D8E9F0G";
+
+// Initialiser Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let messaging = null;
+
+// ============================================
+// ENREGISTREMENT DU SERVICE WORKER
+// ============================================
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    console.log('❌ Service Worker non supporté');
+    return false;
+  }
+
+  try {
+    // Désenregistrer tous les anciens SW
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      await registration.unregister();
+    }
+
+    // Enregistrer le SW Firebase
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+      scope: '/firebase-cloud-messaging-push-scope',
+      updateViaCache: 'none'
+    });
+    
+    console.log('✅ Service Worker Firebase enregistré');
+    await navigator.serviceWorker.ready;
+    return true;
+  } catch (error) {
+    console.error('❌ Erreur SW:', error);
+    return false;
+  }
+}
+
+// ============================================
+// INITIALISATION FIREBASE MESSAGING
+// ============================================
+window.initializeFCM = async function() {
+  if (!('Notification' in window)) {
+    console.log('❌ Notifications non supportées');
+    return null;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('❌ Permission refusée');
+      return null;
+    }
+
+    await registerServiceWorker();
+    messaging = getMessaging(app);
+    
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY
+    });
+    
+    if (token) {
+      console.log('✅ Token FCM obtenu:', token.substring(0, 30) + '...');
+      localStorage.setItem('fcm_token', token);
+      
+      // Sauvegarder le token si parent connecté
+      if (window.currentParent?.matricule) {
+        await updateDoc(doc(db, 'parents', window.currentParent.matricule), {
+          fcmToken: token,
+          notificationEnabled: true,
+          lastTokenUpdate: serverTimestamp()
+        });
+      }
+      return token;
+    }
+  } catch (error) {
+    console.error('❌ Erreur FCM:', error);
+  }
+  return null;
+};
+
+// ============================================
+// ÉCOUTEUR NOTIFICATIONS - TEMPS RÉEL
+// ============================================
+window.setupRealtimeNotifications = function() {
+  if (!window.currentParent || !window.childrenList || window.childrenList.length === 0) {
+    setTimeout(window.setupRealtimeNotifications, 3000);
+    return;
+  }
+
+  console.log('🔔 Configuration des écouteurs temps réel...');
+  
+  const enfantMatricules = window.childrenList.map(child => child.matricule);
+  
+  // === ÉCOUTEUR INCIDENTS ===
+  const incidentsQuery = query(
+    collection(db, 'incidents'),
+    where('studentMatricule', 'in', enfantMatricules),
+    where('published', '==', true),
+    orderBy('createdAt', 'desc'),
+    limit(20)
+  );
+
+  onSnapshot(incidentsQuery, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'added') {
+        const incident = change.doc.data();
+        const child = window.childrenList.find(c => c.matricule === incident.studentMatricule);
+        
+        if (child) {
+          const now = new Date();
+          const incidentTime = incident.createdAt?.toDate() || now;
+          const diffMinutes = (now - incidentTime) / (1000 * 60);
+          
+          // Notifier seulement les incidents récents
+          if (diffMinutes < 30) {
+            console.log('🚨 NOUVEL INCIDENT:', incident.type, 'pour', child.fullName);
+            
+            // Notification système
+            if (Notification.permission === 'granted') {
+              new Notification(`⚠️ Incident - ${child.fullName}`, {
+                body: `${incident.type}: ${incident.description?.substring(0, 100) || ''}`,
+                icon: '/icon-192x192.png',
+                badge: '/icon-72x72.png',
+                tag: `incident_${change.doc.id}`,
+                requireInteraction: true,
+                vibrate: [200, 100, 200]
+              });
+            }
+            
+            // Notification via Service Worker
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SHOW_NOTIFICATION',
+                data: {
+                  title: `⚠️ Incident - ${child.fullName}`,
+                  body: `${incident.type}: ${incident.description?.substring(0, 100)}`,
+                  icon: '/icon-192x192.png',
+                  badge: '/icon-72x72.png',
+                  data: {
+                    type: 'incidents',
+                    page: 'presence-incidents',
+                    childId: child.matricule,
+                    childName: child.fullName,
+                    incidentId: change.doc.id
+                  }
+                }
+              });
+            }
+          }
+        }
+      }
+    });
+  });
+
+  // === ÉCOUTEUR PRÉSENCES ===
+  const attendanceQuery = query(
+    collection(db, 'student_attendance'),
+    where('studentId', 'in', enfantMatricules),
+    where('published', '==', true),
+    orderBy('date', 'desc'),
+    limit(20)
+  );
+
+  onSnapshot(attendanceQuery, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'added') {
+        const attendance = change.doc.data();
+        const child = window.childrenList.find(c => c.matricule === attendance.studentId);
+        
+        if (child) {
+          const today = new Date().toISOString().split('T')[0];
+          
+          if (attendance.date === today) {
+            let statusText = '';
+            if (attendance.status === 'present') statusText = '✅ présent';
+            else if (attendance.status === 'absent') statusText = '🚫 absent';
+            else if (attendance.status === 'late') statusText = '🟠 en retard';
+            
+            // Notification système
+            if (Notification.permission === 'granted') {
+              new Notification(`📅 Présence - ${child.fullName}`, {
+                body: `${child.fullName} est ${statusText} aujourd'hui`,
+                icon: '/icon-192x192.png',
+                badge: '/icon-72x72.png'
+              });
+            }
+            
+            // Notification via Service Worker
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SHOW_NOTIFICATION',
+                data: {
+                  title: `📅 Présence - ${child.fullName}`,
+                  body: `${child.fullName} est ${statusText} aujourd'hui`,
+                  icon: '/icon-192x192.png',
+                  badge: '/icon-72x72.png',
+                  data: {
+                    type: 'presence',
+                    page: 'presence-incidents',
+                    childId: child.matricule,
+                    date: attendance.date,
+                    status: attendance.status
+                  }
+                }
+              });
+            }
+          }
+        }
+      }
+    });
+  });
+
+  console.log('✅ Écouteurs temps réel configurés');
+};
+
+// ============================================
+// AUTHENTIFICATION
+// ============================================
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    const q = query(collection(db, 'parents'), where('uid', '==', user.uid));
+    const snap = await getDocs(q);
+    
+    if (!snap.empty) {
+      window.currentParent = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      
+      // Charger les enfants
+      window.childrenList = [];
+      for (const childData of window.currentParent.children) {
+        const childMatricule = childData.matricule || childData;
+        const childDoc = await getDoc(doc(db, 'students', childMatricule));
+        if (childDoc.exists()) {
+          window.childrenList.push({
+            matricule: childMatricule,
+            ...childDoc.data()
+          });
+        }
+      }
+      
+      // Initialiser les notifications
+      setTimeout(async () => {
+        await window.initializeFCM();
+        window.setupRealtimeNotifications();
+      }, 3000);
+    }
+  }
+});
+
+// Exposer les fonctions globalement
+window.db = db;
+window.auth = auth;
+</script>
   
 
     <style>
