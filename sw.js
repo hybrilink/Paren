@@ -123,8 +123,8 @@ async function handleBackgroundNotification(payload) {
   // Options de notification
   const notificationOptions = {
     body: notificationBody,
-    icon: './icons/icon-192x192.png',
-    badge: './icons/icon-72x72.png',
+    icon: 'icon-192x192.png',
+    badge: 'icon-72x72.png',
     tag: notificationTag,
     data: notificationData,
     requireInteraction: true,
@@ -317,8 +317,8 @@ async function sendNotificationToClient(notification) {
   // 1. Afficher notification système
   await self.registration.showNotification(notification.title, {
     body: notification.body,
-    icon: './icons/icon-192x192.png',
-    badge: './icons/icon-72x72.png',
+    icon: 'icon-192x192.png',
+    badge: 'icon-72x72.png',
     tag: notification.type,
     data: notification.data,
     requireInteraction: true,
@@ -327,7 +327,7 @@ async function sendNotificationToClient(notification) {
       {
         action: 'open',
         title: '👀 Ouvrir',
-        icon: './icons/icon-72x72.png'
+        icon: 'icon-72x72.png'
       }
     ]
   });
@@ -354,7 +354,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
   const notificationData = event.notification.data || {};
-  const urlToOpen = notificationData.url || './index.html';
+  const urlToOpen = notificationData.url || '.index.html';
   
   event.waitUntil(
     clients.matchAll({
@@ -445,7 +445,7 @@ self.addEventListener('fetch', (event) => {
           }
           // Page hors ligne pour les navigations
           if (request.mode === 'navigate') {
-            return caches.match('./offline.html');
+            return caches.match('offline.html');
           }
           return new Response('', {
             status: 404,
