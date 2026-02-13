@@ -2,7 +2,7 @@
   "name": "CS La Colombe - Espace Parent",
   "short_name": "CS Colombe",
   "description": "Suivi scolaire temps réel avec notifications",
-  "start_url": "index.html",
+  "start_url": ".index.html",
   "display": "standalone",
   "background_color": "#3498db",
   "theme_color": "#3498db",
@@ -11,49 +11,49 @@
   "lang": "fr",
   "icons": [
     {
-      "src": "icons/icon-72x72.png",
+      "src": "icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-96x96.png",
+      "src": "icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-128x128.png",
+      "src": "icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-144x144.png",
+      "src": "icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-152x152.png",
+      "src": "icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-192x192.png",
+      "src": "icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-384x384.png",
+      "src": "icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512x512.png",
+      "src": "icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -61,13 +61,13 @@
   ],
   "screenshots": [
     {
-      "src": "screenshots/screenshot1.png",
+      "src": "screenshot1.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide"
     },
     {
-      "src": "screenshots/screenshot2.png",
+      "src": "screenshot2.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow"
@@ -79,14 +79,14 @@
       "short_name": "Dashboard",
       "description": "Accéder au tableau de bord",
       "url": "index.html#dashboard",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Cotes et Notes",
       "short_name": "Notes",
       "description": "Consulter les notes",
       "url": "index.html#grades",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
     }
   ],
   "related_applications": [],
