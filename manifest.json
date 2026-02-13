@@ -1,62 +1,59 @@
 {
   "name": "CS La Colombe - Espace Parent",
-  "short_name": "Espace Parent",
-  "description": "Suivi scolaire en temps réel pour parents",
-  "start_url": "./index.html",
+  "short_name": "CS Colombe",
+  "description": "Suivi scolaire temps réel avec notifications",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#3498db",
   "theme_color": "#3498db",
   "orientation": "portrait",
   "scope": "./",
-  "lang": "fr-FR",
-  "dir": "ltr",
-  "prefer_related_applications": false,
-  "categories": ["education", "productivity"],
+  "lang": "fr",
   "icons": [
     {
-      "src": "icon-72x72.png",
+      "src": "icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-96x96.png",
+      "src": "icons/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-128x128.png",
+      "src": "icons/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-144x144.png",
+      "src": "icons/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-152x152.png",
+      "src": "icons/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-192x192.png",
+      "src": "icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-384x384.png",
+      "src": "icons/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512x512.png",
+      "src": "icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -64,41 +61,37 @@
   ],
   "screenshots": [
     {
-      "src": "screenshot1.png",
+      "src": "screenshots/screenshot1.png",
       "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Tableau de bord"
+      "form_factor": "wide"
     },
     {
-      "src": "screenshot2.png",
+      "src": "screenshots/screenshot2.png",
       "sizes": "720x1280",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Suivi des notes"
+      "form_factor": "narrow"
     }
   ],
   "shortcuts": [
     {
       "name": "Tableau de bord",
-      "short_name": "Accueil",
-      "description": "Voir le tableau de bord",
-      "url": "./index.html?page=dashboard",
-      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+      "short_name": "Dashboard",
+      "description": "Accéder au tableau de bord",
+      "url": "index.html#dashboard",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
-      "name": "Notes",
+      "name": "Cotes et Notes",
       "short_name": "Notes",
       "description": "Consulter les notes",
-      "url": "./index.html?page=grades",
-      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Présences",
-      "short_name": "Présences",
-      "description": "Voir les présences",
-      "url": "./index.html?page=presence-incidents",
-      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+      "url": "index.html#grades",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
     }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "categories": ["education", "productivity"],
+  "gcm_sender_id": "269629842962",
+  "gcm_user_visible_only": true
 }
