@@ -7,26 +7,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
 <!-- PWA Meta Tags -->
-  <meta name="application-name" content="TheoVêt">
+  <meta name="application-name" content="hybrilink">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="TheoVêt">
-  <meta name="description" content="Solution complète de gestion de commerce de vêtements">
+  <meta name="apple-mobile-web-app-title" content="Hybrilink">
+  <meta name="description" content="Solution complète de gestion de eleve">
   <meta name="format-detection" content="telephone=no">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="msapplication-TileColor" content="#3498db">
   <meta name="msapplication-tap-highlight" content="no">
   <meta name="theme-color" content="#3498db">
 
-   <!-- Service Worker et mise à jour -->
-
+<!-- Service Worker et mise à jour -->
+    <meta name="version" content="2.1.0">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 
 
   <!-- Apple Touch Icons -->
   <link rel="apple-touch-icon" href="icon-192x192.png">
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192x192.png">
   <link rel="apple-touch-icon" sizes="72x72" href="icon-72x72.png">
-  <link rel="apple-touch-icon" sizes="167x167" href="icon-167x167.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167x167.png">
+
+  
 
   <!-- Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -10381,7 +10384,535 @@ window.firebaseMessagingReady = true;
 </script>
 
             
+        <script>
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp();
+
+const db = admin.firestore();
+
+// ========== 1. NOTIFICATION INCIDENT ==========
+exports.onIncidentCreated = functions.firestore
+  .document('incidents/{incidentId}')
+  .onCreate(async (snap, context) => {
+    const incident = snap.data();
+    
+    try {
+      // Récupérer les parents de l'élève
+      const studentDoc = await db.collection('students')
+        .doc(incident.studentId).get();
+      
+      if (!studentDoc.exists) return null;
+      
+      const studentData = studentDoc.data();
+      const parentId = studentData.parentId;
+      
+      if (!parentId) return null;
+      
+      // Récupérer le token FCM du parent
+      const parentDoc = await db.collection('parents')
+        .doc(parentId).get();
+      
+      if (!parentDoc.exists) return null;
+      
+      const parentData = parentDoc.data();
+      const fcmToken = parentData.fcmToken;
+      
+      if (!fcmToken) return null;
+      
+      // Message de notification
+      const message = {
+        notification: {
+          title: '⚠️ Nouvel incident signalé',
+          body: `${incident.studentName}: ${incident.type}`
+        },
+        data: {
+          type: 'incident',
+          page: 'presence-incidents',
+          childId: incident.studentId,
+          childName: incident.studentName,
+          incidentId: context.params.incidentId,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK'
+        },
+        token: fcmToken
+      };
+      
+      // Envoyer la notification
+      await admin.messaging().send(message);
+      
+      // Sauvegarder la notification dans Firestore
+      await db.collection('notifications').add({
+        userId: parentId,
+        type: 'incident',
+        title: message.notification.title,
+        body: message.notification.body,
+        data: message.data,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur envoi notification incident:', error);
+      return null;
+    }
+  });
+
+// ========== 2. NOTIFICATION PRÉSENCE ==========
+exports.onAttendancePublished = functions.firestore
+  .document('student_attendance/{attendanceId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    
+    // Vérifier si c'est une publication
+    if (after.published && !before.published) {
+      try {
+        // Récupérer l'élève
+        const studentDoc = await db.collection('students')
+          .doc(after.studentId).get();
         
+        if (!studentDoc.exists) return null;
+        
+        const studentData = studentDoc.data();
+        const parentId = studentData.parentId;
+        
+        if (!parentId) return null;
+        
+        // Récupérer le token FCM
+        const parentDoc = await db.collection('parents')
+          .doc(parentId).get();
+        
+        if (!parentDoc.exists) return null;
+        
+        const parentData = parentDoc.data();
+        const fcmToken = parentData.fcmToken;
+        
+        if (!fcmToken) return null;
+        
+        const statusText = getStatusText(after.status);
+        
+        // Message de notification
+        const message = {
+          notification: {
+            title: '📅 Présence mise à jour',
+            body: `${studentData.fullName} ${statusText} aujourd'hui`
+          },
+          data: {
+            type: 'presence',
+            page: 'presence-incidents',
+            childId: after.studentId,
+            childName: studentData.fullName,
+            status: after.status,
+            date: after.date,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK'
+          },
+          token: fcmToken
+        };
+        
+        await admin.messaging().send(message);
+        
+        await db.collection('notifications').add({
+          userId: parentId,
+          type: 'presence',
+          title: message.notification.title,
+          body: message.notification.body,
+          data: message.data,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Erreur envoi notification présence:', error);
+        return null;
+      }
+    }
+    
+    return null;
+  });
+
+// ========== 3. NOTIFICATION NOTES ==========
+exports.onGradePublished = functions.firestore
+  .document('parent_grades/{gradeId}')
+  .onCreate(async (snap, context) => {
+    const grade = snap.data();
+    
+    try {
+      const parentId = grade.parentId;
+      
+      if (!parentId) return null;
+      
+      const parentDoc = await db.collection('parents')
+        .doc(parentId).get();
+      
+      if (!parentDoc.exists) return null;
+      
+      const parentData = parentDoc.data();
+      const fcmToken = parentData.fcmToken;
+      
+      if (!fcmToken) return null;
+      
+      const percentage = (grade.grade / grade.maxPoints * 100).toFixed(1);
+      
+      const message = {
+        notification: {
+          title: '📊 Nouvelle note publiée',
+          body: `${grade.studentName}: ${grade.subject} - ${grade.grade}/${grade.maxPoints} (${percentage}%)`
+        },
+        data: {
+          type: 'grade',
+          page: 'grades',
+          childId: grade.studentId,
+          childName: grade.studentName,
+          gradeId: context.params.gradeId,
+          subject: grade.subject,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK'
+        },
+        token: fcmToken
+      };
+      
+      await admin.messaging().send(message);
+      
+      await db.collection('notifications').add({
+        userId: parentId,
+        type: 'grade',
+        title: message.notification.title,
+        body: message.notification.body,
+        data: message.data,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur envoi notification note:', error);
+      return null;
+    }
+  });
+
+// ========== 4. NOTIFICATION DEVOIRS ==========
+exports.onHomeworkPublished = functions.firestore
+  .document('homework/{homeworkId}')
+  .onCreate(async (snap, context) => {
+    const homework = snap.data();
+    
+    try {
+      // Récupérer tous les élèves de la classe
+      const studentsSnapshot = await db.collection('students')
+        .where('class', '==', homework.className)
+        .get();
+      
+      const parentIds = new Set();
+      const studentNames = {};
+      
+      studentsSnapshot.forEach(doc => {
+        const student = doc.data();
+        if (student.parentId) {
+          parentIds.add(student.parentId);
+          studentNames[student.parentId] = student.fullName;
+        }
+      });
+      
+      const dueDate = homework.dueDate.toDate
+        ? homework.dueDate.toDate().toLocaleDateString('fr-FR')
+        : new Date(homework.dueDate).toLocaleDateString('fr-FR');
+      
+      // Envoyer à chaque parent
+      for (const parentId of parentIds) {
+        const parentDoc = await db.collection('parents')
+          .doc(parentId).get();
+        
+        if (!parentDoc.exists) continue;
+        
+        const parentData = parentDoc.data();
+        const fcmToken = parentData.fcmToken;
+        
+        if (!fcmToken) continue;
+        
+        const message = {
+          notification: {
+            title: '📚 Nouveau devoir',
+            body: `${homework.subject}: ${homework.title} - À rendre le ${dueDate}`
+          },
+          data: {
+            type: 'homework',
+            page: 'homework',
+            childId: studentNames[parentId],
+            childName: studentNames[parentId],
+            homeworkId: context.params.homeworkId,
+            subject: homework.subject,
+            dueDate: dueDate,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK'
+          },
+          token: fcmToken
+        };
+        
+        await admin.messaging().send(message);
+        
+        await db.collection('notifications').add({
+          userId: parentId,
+          type: 'homework',
+          title: message.notification.title,
+          body: message.notification.body,
+          data: message.data,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      return { success: true, count: parentIds.size };
+    } catch (error) {
+      console.error('❌ Erreur envoi notification devoir:', error);
+      return null;
+    }
+  });
+
+// ========== 5. NOTIFICATION COMMUNIQUÉ ==========
+exports.onCommuniquePublished = functions.firestore
+  .document('parent_communiques/{communiqueId}')
+  .onCreate(async (snap, context) => {
+    const communique = snap.data();
+    
+    try {
+      // Récupérer tous les parents concernés
+      const parentIds = communique.parentIds || [];
+      
+      for (const parentId of parentIds) {
+        const parentDoc = await db.collection('parents')
+          .doc(parentId).get();
+        
+        if (!parentDoc.exists) continue;
+        
+        const parentData = parentDoc.data();
+        const fcmToken = parentData.fcmToken;
+        
+        if (!fcmToken) continue;
+        
+        const deadline = communique.deadline.toDate
+          ? communique.deadline.toDate().toLocaleDateString('fr-FR')
+          : new Date(communique.deadline).toLocaleDateString('fr-FR');
+        
+        const message = {
+          notification: {
+            title: '📄 Nouveau communiqué',
+            body: `${communique.feeType} - ${communique.month} - À payer avant le ${deadline}`
+          },
+          data: {
+            type: 'communique',
+            page: 'communiques',
+            communiqueId: context.params.communiqueId,
+            feeType: communique.feeType,
+            amount: communique.amount.toString(),
+            deadline: deadline,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK'
+          },
+          token: fcmToken
+        };
+        
+        await admin.messaging().send(message);
+        
+        await db.collection('notifications').add({
+          userId: parentId,
+          type: 'communique',
+          title: message.notification.title,
+          body: message.notification.body,
+          data: message.data,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      return { success: true, count: parentIds.length };
+    } catch (error) {
+      console.error('❌ Erreur envoi notification communiqué:', error);
+      return null;
+    }
+  });
+
+// ========== 6. FONCTION POUR INITIALISER FCM ==========
+exports.initializeFCMToken = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Authentification requise'
+    );
+  }
+  
+  const { parentId, token } = data;
+  
+  try {
+    await db.collection('parents').doc(parentId).update({
+      fcmToken: token,
+      notificationEnabled: true,
+      lastTokenUpdate: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    throw new functions.https.HttpsError(
+      'internal',
+      'Erreur lors de la sauvegarde du token',
+      error
+    );
+  }
+});
+
+// ========== FONCTION UTILITAIRE ==========
+function getStatusText(status) {
+  const statusMap = {
+    'present': '✅ présent',
+    'absent': '🚫 absent',
+    'late': '🟠 en retard'
+  };
+  return statusMap[status] || status;
+}</script>
+<script>
+// firebase-init.js - Script UNIQUE pour l'initialisation Firebase
+(function() {
+  console.log('🔥 Initialisation Firebase...');
+  
+  const firebaseConfig = {
+    apiKey: "AIzaSyBn7VIddclO7KtrXb5sibCr9SjVLjOy-qI",
+    authDomain: "theo1d.firebaseapp.com",
+    projectId: "theo1d",
+    storageBucket: "theo1d.firebasestorage.app",
+    messagingSenderId: "269629842962",
+    appId: "1:269629842962:web:a80a12b04448fe1e595acb",
+    measurementId: "G-TNSG1XFMDZ"
+  };
+
+  // Clé VAPID UNIQUE
+  const VAPID_KEY = "BM8H6cADaP6tiA4t9Oc9D36jk1UmYoUBV3cATlJ5mvZ_-eQ5xd6HgX5twxWvZ2U2Y98HBkJ8bTph7epPJJYqBpc";
+
+  let app = null;
+  let messaging = null;
+  let db = null;
+  let auth = null;
+
+  window.FirebaseManager = {
+    initialized: false,
+    
+    async initialize() {
+      if (this.initialized) {
+        console.log('✅ Firebase déjà initialisé');
+        return true;
+      }
+
+      try {
+        // Importer Firebase
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js');
+        const { getMessaging, getToken, onMessage, isSupported } = await import('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging.js');
+        const { getFirestore } = await import('https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js');
+        const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js');
+
+        // Initialiser
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        // Vérifier support Messaging
+        const supported = await isSupported();
+        if (supported) {
+          messaging = getMessaging(app);
+          
+          // Demander permission
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            console.log('✅ Permission notification accordée');
+            
+            // Enregistrer Service Worker
+            const registration = await navigator.serviceWorker.ready;
+            
+            // Obtenir token
+            const token = await getToken(messaging, {
+              vapidKey: VAPID_KEY,
+              serviceWorkerRegistration: registration
+            });
+            
+            if (token) {
+              console.log('✅ Token FCM obtenu:', token.substring(0, 20) + '...');
+              window.FCMToken = token;
+            }
+            
+            // Écouter messages premier plan
+            onMessage(messaging, (payload) => {
+              console.log('📨 Message premier plan:', payload);
+              this.handleForegroundMessage(payload);
+            });
+          }
+        }
+
+        this.initialized = true;
+        console.log('✅ Firebase initialisé avec succès');
+        
+        return true;
+      } catch (error) {
+        console.error('❌ Erreur initialisation Firebase:', error);
+        return false;
+      }
+    },
+
+    handleForegroundMessage(payload) {
+      const title = payload.notification?.title || 'CS La Colombe';
+      const body = payload.notification?.body || 'Nouvelle notification';
+      const data = payload.data || {};
+
+      // Afficher notification si l'app est ouverte
+      if (Notification.permission === 'granted' && !document.hidden) {
+        new Notification(title, {
+          body: body,
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-72x72.png',
+          data: data,
+          requireInteraction: true,
+          vibrate: [200, 100, 200]
+        });
+      }
+
+      // Mettre à jour l'interface
+      if (window.updateNotificationCount) {
+        window.updateNotificationCount(1);
+      }
+
+      // Sauvegarder notification
+      this.saveNotification({ title, body, data });
+    },
+
+    saveNotification(notification) {
+      try {
+        const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+        notifications.unshift({
+          id: `notif_${Date.now()}`,
+          ...notification,
+          read: false,
+          timestamp: new Date().toISOString()
+        });
+        
+        if (notifications.length > 50) notifications.length = 50;
+        localStorage.setItem('notifications', JSON.stringify(notifications));
+      } catch (e) {
+        console.error('❌ Erreur sauvegarde notification:', e);
+      }
+    },
+
+    getStatus() {
+      return {
+        initialized: this.initialized,
+        permission: Notification.permission,
+        hasToken: !!window.FCMToken,
+        token: window.FCMToken ? `${window.FCMToken.substring(0, 10)}...` : null
+      };
+    }
+  };
+
+  // Initialiser au chargement
+  document.addEventListener('DOMContentLoaded', () => {
+    window.FirebaseManager.initialize();
+  });
+
+  console.log('📦 Firebase Manager chargé');
+})();</script>
     
 </body>
 </html>  
