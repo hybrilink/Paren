@@ -1,12 +1,12 @@
+// firebase-messaging-sw.js - À la RACINE du projet
 // ============================================
-// FIREBASE MESSAGING SERVICE WORKER
-// NOTIFICATIONS EN ARRIÈRE-PLAN - PWA FERMÉE
+// SERVICE WORKER UNIQUE POUR NOTIFICATIONS
 // ============================================
 
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
-// Configuration Firebase
+// Configuration Firebase (la MÊME que dans index.html)
 const firebaseConfig = {
   apiKey: "AIzaSyBn7VIddclO7KtrXb5sibCr9SjVLjOy-qI",
   authDomain: "theo1d.firebaseapp.com",
@@ -16,50 +16,57 @@ const firebaseConfig = {
   appId: "1:269629842962:web:a80a12b04448fe1e595acb"
 };
 
+// Clé VAPID UNIQUE (celle qui fonctionne)
+const VAPID_KEY = "BM8H6cADaP6tiA4t9Oc9D36jk1UmYoUBV3cATlJ5mvZ_-eQ5xd6HgX5twxWvZ2U2Y98HBkJ8bTph7epPJJYqBpc";
+
 // Initialiser Firebase
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Version du SW
+const SW_VERSION = '2.1.2';
+
+// Installation
+self.addEventListener('install', (event) => {
+  console.log(`✅ SW v${SW_VERSION}: Installation`);
+  self.skipWaiting(); // Activation immédiate
+});
+
+// Activation
+self.addEventListener('activate', (event) => {
+  console.log(`✅ SW v${SW_VERSION}: Activation`);
+  event.waitUntil(clients.claim()); // Prendre le contrôle immédiatement
+});
+
 // ========== NOTIFICATIONS EN ARRIÈRE-PLAN ==========
-// S'EXÉCUTE MÊME QUAND LA PWA EST COMPLÈTEMENT FERMÉE
+// S'exécute quand l'application est fermée
 messaging.onBackgroundMessage((payload) => {
-  console.log('📨 [SW] Message reçu en arrière-plan (PWA fermée):', payload);
+  console.log('📨 [BACKGROUND] Message reçu (PWA fermée):', payload);
   
   const notificationTitle = payload.notification?.title || 'CS La Colombe';
   const notificationBody = payload.notification?.body || 'Nouvelle notification';
   const notificationData = payload.data || {};
   
-  // Déterminer l'icône selon le type
-  let icon = '/icon-192x192.png';
-  let badge = '/icon-72x72.png';
-  
-  if (notificationData.type === 'incidents') {
-    icon = '/icon-192x192.png';
-    badge = '/icon-72x72.png';
-  }
-  
+  // Définir les options de notification
   const notificationOptions = {
     body: notificationBody,
-    icon: icon,
-    badge: badge,
+    icon: '/icon-192x192.png',
+    badge: '/icon-72x72.png',
     vibrate: [200, 100, 200],
     data: notificationData,
-    tag: notificationData.type + '_' + (notificationData.incidentId || Date.now()),
+    tag: notificationData.type + '_' + Date.now(),
     renotify: true,
-    requireInteraction: true, // RESTE À L'ÉCRAN
+    requireInteraction: true, // RESTE À L'ÉCRAN jusqu'à interaction
     silent: false,
     timestamp: Date.now(),
     actions: [
-      { action: 'open', title: '🔓 Ouvrir l\'application' },
+      { action: 'open', title: '🔓 Ouvrir' },
       { action: 'close', title: '❌ Fermer' }
     ]
   };
 
-  // AFFICHER LA NOTIFICATION
-  return self.registration.showNotification(
-    notificationTitle,
-    notificationOptions
-  );
+  // Afficher la notification
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 // ========== GESTION DU CLIC SUR LA NOTIFICATION ==========
@@ -78,16 +85,18 @@ self.addEventListener('notificationclick', (event) => {
   
   event.waitUntil(
     (async () => {
-      // Chercher une fenêtre existante
+      // Vérifier si l'application est déjà ouverte
       const allClients = await clients.matchAll({
         includeUncontrolled: true,
         type: 'window'
       });
       
-      // Ouvrir ou focuser l'application
+      // Si une fenêtre existe, l'utiliser
       for (const client of allClients) {
-        if (client.url.includes('index.html') && 'focus' in client) {
+        if (client.url.includes('index.html')) {
           await client.focus();
+          
+          // Envoyer les données pour navigation
           client.postMessage({
             type: 'NOTIFICATION_CLICK',
             data: data
@@ -96,21 +105,19 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       
-      // Ouvrir une nouvelle fenêtre
+      // Sinon, ouvrir une nouvelle fenêtre
       await clients.openWindow('index.html');
     })()
   );
 });
 
-// ========== ACTIVATION IMMÉDIATE ==========
-self.addEventListener('install', (event) => {
-  console.log('✅ [SW] Installation...');
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('✅ [SW] Activation...');
-  event.waitUntil(clients.claim());
+// ========== GESTION DES MESSAGES ==========
+self.addEventListener('message', (event) => {
+  const { type, data } = event.data || {};
+  
+  if (type === 'PING') {
+    event.source?.postMessage({ type: 'PONG', version: SW_VERSION });
+  }
 });
 
 console.log('🔥 [SW] Firebase Messaging Service Worker chargé');
